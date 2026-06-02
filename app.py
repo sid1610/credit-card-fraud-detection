@@ -13,11 +13,35 @@ st.set_page_config(
 # ─── CSS ──────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-html, body, [class*="css"] { font-family: 'Inter', 'Segoe UI', sans-serif; }
+html, body, [class*="css"] { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 .stApp { background-color: #f1f5f9; }
-#MainMenu, footer { visibility: hidden; }
+#MainMenu, footer,
+header[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+.stDeployButton {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+[data-testid="stAppViewContainer"] {
+    background: #f1f5f9;
+}
+
+[data-testid="stMain"] label,
+[data-testid="stMain"] [data-testid="stWidgetLabel"],
+[data-testid="stMain"] [data-testid="stWidgetLabel"] *,
+section.main label,
+section.main [data-testid="stWidgetLabel"],
+section.main [data-testid="stWidgetLabel"] * {
+    color: #334155 !important;
+}
+
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] p,
+section.main [data-testid="stMarkdownContainer"] p {
+    color: inherit;
+}
 
 /* ── Hero Banner ── */
 .hero {
@@ -161,7 +185,9 @@ html, body, [class*="css"] { font-family: 'Inter', 'Segoe UI', sans-serif; }
 .sidebar-card strong { color: #e2e8f0 !important; }
 
 /* ── Analyze Button ── */
-div[data-testid="stVerticalBlock"] .stButton > button[kind="primary"] {
+div[data-testid="stVerticalBlock"] .stButton > button[kind="primary"],
+div[data-testid="stVerticalBlock"] .stFormSubmitButton > button,
+div[data-testid="stFormSubmitButton"] > button {
     height: 3.2rem !important;
     font-size: 1rem !important;
     font-weight: 700 !important;
@@ -170,6 +196,14 @@ div[data-testid="stVerticalBlock"] .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
     border: none !important;
     box-shadow: 0 4px 14px rgba(37,99,235,0.35) !important;
+}
+
+div[data-testid="stButton"] > button:disabled,
+div[data-testid="stFormSubmitButton"] > button:disabled {
+    color: #475569 !important;
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+    opacity: 1 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -253,6 +287,15 @@ def make_prediction(time_v, amount_v, v_dict):
     prob = model.predict_proba(X)[0][1]
     return int(pred), float(prob)
 
+def sample_prediction_results():
+    expected = {"normal": 0, "suspicious": 0, "fraud": 1}
+    results = []
+    for key, sample in SAMPLES.items():
+        v_dict = {col: sample[col] for col in feature_columns if col.startswith("V")}
+        pred, prob = make_prediction(sample["Time"], sample["Amount"], v_dict)
+        results.append((key, expected[key], pred, prob))
+    return results
+
 # ─── Session-state defaults ────────────────────────────────────────────────────
 _all_cols = feature_columns
 for _c in _all_cols:
@@ -279,6 +322,14 @@ with st.sidebar:
         <p><strong>Sklearn version</strong><br>1.5.1</p>
     </div>
     """, unsafe_allow_html=True)
+
+    with st.expander("Model self-check", expanded=False):
+        for name, expected, pred, prob in sample_prediction_results():
+            status = "PASS" if pred == expected else "FAIL"
+            st.markdown(
+                f"**{status}** `{name}` - expected `{expected}`, "
+                f"predicted `{pred}`, fraud prob `{prob:.1%}`"
+            )
 
     st.markdown("### 📊 Performance")
     st.markdown("""
@@ -373,10 +424,10 @@ with col_a:
         help="Dollar value of the transaction.",
     )
 
-with st.expander("🔬 PCA Features (V1 – V28) — click to expand", expanded=False):
+with st.expander("🔬 PCA Features (V1 - V28) - click to expand", expanded=True):
     st.caption(
-        "These 28 features are the result of PCA transformation applied to the "
-        "original transaction data to protect cardholder privacy."
+        "These 28 features are the model's main fraud signals. Samples fill them automatically; "
+        "manual tests should include these values for meaningful predictions."
     )
     v_grid = st.columns(4)
     v_values: dict = {}
